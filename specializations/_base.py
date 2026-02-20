@@ -325,16 +325,17 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
     # Главное меню
     # ------------------------------------------------------------------ #
     async def on_main_menu(bot: "VKBot", query: "VKCallbackQuery", user_id: str):
+        from main import MAIN_MENU_TEXT as _MENU_TEXT
         await state_manager.clear(user_id)
         chat_id = query.message.chat.chatId
         await bot.answer_callback(query.queryId)
         try:
             await bot.edit_text(
                 chat_id, query.message.msgId,
-                MAIN_MENU_TEXT, get_main_keyboard()
+                _MENU_TEXT, get_main_keyboard()
             )
         except Exception:
-            await bot.send_text(chat_id, MAIN_MENU_TEXT, get_main_keyboard())
+            await bot.send_text(chat_id, _MENU_TEXT, get_main_keyboard())
 
     # ------------------------------------------------------------------ #
     # Помощь
