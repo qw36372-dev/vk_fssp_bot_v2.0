@@ -151,13 +151,6 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
         await state_manager.set_state(user_id, TestStates.ANSWERING_QUESTION)
         await state_manager.update_data(user_id, test_state=test_state)
         
-        # Редактируем сообщение выбора сложности
-        try:
-            await bot.edit_text(chat_id, query.message.msgId,
-                f"⏳ Загружаю тест: {spec_label}\nУровень: {difficulty.value}...")
-        except Exception:
-            pass
-        
         await show_question(bot, chat_id, test_state, question_index=0)
         await state_manager.update_data(user_id, test_state=test_state)
         
