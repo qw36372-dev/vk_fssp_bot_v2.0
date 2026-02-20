@@ -139,7 +139,17 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
         chat_id = query.message.chat.chatId
         
         async def on_timeout():
-            await finish_test(bot, query, user_id, test_state)
+            try:
+                # Читаем актуальный test_state из state_manager (он обновлялся по ходу теста)
+                current_data = await state_manager.get_data(user_id)
+                current_test_state = current_data.get("test_state", test_state)
+                
+                # Сразу блокируем дальнейшие ответы
+                await state_manager.set_state(user_id, TestStates.SHOWING_RESULTS)
+                
+                await finish_test(bot, query, user_id, current_test_state, timed_out=True)
+            except Exception as e:
+                logger.error(f"❌ Ошибка таймаута: {e}", exc_info=True)
         
         timer = create_timer(difficulty, on_timeout)
         await timer.start()
