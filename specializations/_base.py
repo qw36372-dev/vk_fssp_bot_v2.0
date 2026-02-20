@@ -24,7 +24,6 @@ from library.core import (
     handle_next_question, finish_test
 )
 from library.timers import create_timer
-from library.certificates import generate_certificate
 from library.stats import stats_manager
 from config.settings import settings
 
@@ -205,7 +204,7 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
             asyncio.create_task(clear_answers())
 
     # ------------------------------------------------------------------ #
-    # Генерация PDF сертификата
+    # Текстовый сертификат (с автоскрытием)
     # ------------------------------------------------------------------ #
     async def on_generate_cert(bot: "VKBot", query: "VKCallbackQuery", user_id: str):
         data = await state_manager.get_data(user_id)
@@ -213,60 +212,48 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
         if not test_state:
             await bot.answer_callback(query.queryId, "❌ Данные теста не найдены", True)
             return
-        
-        await bot.answer_callback(query.queryId, "📄 Генерация сертификата...")
+
+        await bot.answer_callback(query.queryId, "📄 Формирую сертификат...")
         chat_id = query.message.chat.chatId
-        
-        try:
-            pdf_buffer = await generate_certificate(test_state, user_id)
-            pdf_bytes = pdf_buffer.read()
-            
-            caption = (
-                f"🏆 <b>Ваш сертификат готов!</b>\n\n"
-                f"Специализация: {test_state.specialization.upper()}\n"
-                f"Оценка: {test_state.grade.upper()}\n"
-                f"Результат: {test_state.percentage:.1f}%"
-            )
-            
-            resp = await bot.send_file(
-                chat_id,
-                pdf_bytes,
-                filename=f"certificate_{test_state.specialization}.pdf",
-                caption=caption
-            )
-            
-            # Если файл заблокирован корпоративным файрволом — отправляем текстовый сертификат
-            if resp and resp.get("raw") and "Access Blocked" in str(resp.get("raw", "")):
-                raise ValueError("Файл заблокирован корпоративным сервером")
-                
-        except Exception as e:
-            logger.warning(f"⚠️ Отправка PDF невозможна ({e}), отправляем текстовый сертификат")
-            
-            from datetime import datetime
-            grade_emoji = {
-                "отлично": "🏆", "хорошо": "👍",
-                "удовлетворительно": "👌", "неудовлетворительно": "❌"
-            }
-            g_emoji = grade_emoji.get(test_state.grade, "📊")
-            
-            cert_text = (
-                f"📜 <b>СЕРТИФИКАТ</b>\n"
-                f"<i>о прохождении профессионального тестирования</i>\n\n"
-                f"👤 <b>ФИО:</b> {test_state.full_name}\n"
-                f"💼 <b>Должность:</b> {test_state.position}\n"
-                f"🏢 <b>Подразделение:</b> {test_state.department}\n\n"
-                f"📚 <b>Специализация:</b> {test_state.specialization.upper()}\n"
-                f"📊 <b>Уровень:</b> {test_state.difficulty.value.capitalize()}\n\n"
-                f"{g_emoji} <b>Оценка:</b> {test_state.grade.upper()}\n"
-                f"✅ <b>Правильных ответов:</b> {test_state.correct_count} из {test_state.total_questions}\n"
-                f"💯 <b>Результат:</b> {test_state.percentage:.1f}%\n"
-                f"⏱ <b>Время:</b> {test_state.elapsed_time}\n\n"
-                f"📅 <b>Дата:</b> {datetime.now().strftime('%d.%m.%Y')}\n"
-                f"🆔 <b>ID:</b> {user_id}\n\n"
-                f"<i>ФССП РОССИИ — Система тестирования профессиональной подготовки</i>\n\n"
-                f"⚠️ <i>PDF-файл временно недоступен из-за настроек корпоративного сервера.</i>"
-            )
-            await bot.send_text(chat_id, cert_text)
+
+        from datetime import datetime
+        grade_emoji = {
+            "отлично": "🏆", "хорошо": "👍",
+            "удовлетворительно": "👌", "неудовлетворительно": "❌"
+        }
+        g_emoji = grade_emoji.get(test_state.grade, "📊")
+
+        cert_text = (
+            f"📜 <b>СЕРТИФИКАТ</b>\n"
+            f"<i>о прохождении профессионального тестирования</i>\n\n"
+            f"👤 <b>ФИО:</b> {test_state.full_name}\n"
+            f"💼 <b>Должность:</b> {test_state.position}\n"
+            f"🏢 <b>Подразделение:</b> {test_state.department}\n\n"
+            f"📚 <b>Специализация:</b> {test_state.specialization.upper()}\n"
+            f"📊 <b>Уровень:</b> {test_state.difficulty.value.capitalize()}\n\n"
+            f"{g_emoji} <b>Оценка:</b> {test_state.grade.upper()}\n"
+            f"✅ <b>Правильных ответов:</b> {test_state.correct_count} из {test_state.total_questions}\n"
+            f"💯 <b>Результат:</b> {test_state.percentage:.1f}%\n"
+            f"⏱ <b>Время:</b> {test_state.elapsed_time}\n\n"
+            f"📅 <b>Дата:</b> {datetime.now().strftime('%d.%m.%Y')}\n"
+            f"🆔 <b>ID:</b> {user_id}\n\n"
+            f"<i>ФССП РОССИИ — Система тестирования профессиональной подготовки</i>\n\n"
+            f"⏱ <i>Сертификат скроется через {settings.answers_show_time} сек</i>"
+        )
+
+        resp = await bot.send_text(chat_id, cert_text)
+
+        # Автоскрытие через 60 секунд — как статистика и правильные ответы
+        if resp and resp.get("ok"):
+            msg_id = str(resp.get("msgId", ""))
+            async def hide_cert():
+                await asyncio.sleep(settings.answers_show_time)
+                try:
+                    await bot.edit_text(chat_id, msg_id,
+                        "📜 Сертификат скрыт. Для повтора нажмите кнопку снова.")
+                except Exception:
+                    pass
+            asyncio.create_task(hide_cert())
 
     # ------------------------------------------------------------------ #
     # Повторить тест
