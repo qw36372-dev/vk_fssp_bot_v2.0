@@ -81,6 +81,11 @@ async def handle_answer_toggle(
         await bot.answer_callback(query.queryId, "❌ Ошибка")
         return
     
+    current_state = await state_manager.get_state(user_id)
+    if current_state != TestStates.ANSWERING_QUESTION:
+        await bot.answer_callback(query.queryId, "⏳ Время вышло, тест завершён", True)
+        return
+
     data = await state_manager.get_data(user_id)
     test_state: CurrentTestState | None = data.get("test_state")
     if not test_state:
@@ -114,6 +119,11 @@ async def handle_next_question(
     user_id: str
 ):
     """Кнопка «Далее» — переход к следующему вопросу."""
+    current_state = await state_manager.get_state(user_id)
+    if current_state != TestStates.ANSWERING_QUESTION:
+        await bot.answer_callback(query.queryId, "⏳ Время вышло, тест завершён", True)
+        return
+
     data = await state_manager.get_data(user_id)
     test_state: CurrentTestState | None = data.get("test_state")
     if not test_state:
@@ -144,7 +154,8 @@ async def finish_test(
     bot: "VKBot",
     query: "VKCallbackQuery",
     user_id: str,
-    test_state: CurrentTestState | None = None
+    test_state: CurrentTestState | None = None,
+    timed_out: bool = False
 ):
     """Завершение теста: подсчёт результатов, сохранение в БД."""
     if test_state is None:
@@ -165,14 +176,35 @@ async def finish_test(
     # Сохраняем в БД
     await stats_manager.save_result(user_id, test_state)
     
+    chat_id = query.message.chat.chatId
+    
+    if timed_out:
+        # Сначала показываем сообщение о конце времени
+        timeout_text = (
+            "⏳ <b>ВРЕМЯ ВЫШЛО</b> ⌛️\n\n"
+            "❌ <b>Тест не сдан</b> ❌"
+        )
+        if test_state.last_message_id:
+            try:
+                await bot.edit_text(chat_id, test_state.last_message_id, timeout_text)
+            except Exception:
+                await bot.send_text(chat_id, timeout_text)
+        else:
+            await bot.send_text(chat_id, timeout_text)
+        
+        # Небольшая пауза чтобы пользователь увидел сообщение
+        import asyncio as _asyncio
+        await _asyncio.sleep(2)
+    
     grade_emoji = {
         "отлично": "🏆", "хорошо": "👍",
         "удовлетворительно": "👌", "неудовлетворительно": "❌"
     }
     emoji = grade_emoji.get(test_state.grade, "📊")
     
+    header = "⏳ <b>ВРЕМЯ ВЫШЛО</b> ⌛️\n\n" if timed_out else ""
     result_text = (
-        f"{emoji} <b>Тест завершён!</b>\n\n"
+        f"{header}{emoji} <b>Тест завершён!</b>\n\n"
         f"👤 <b>ФИО:</b> {test_state.full_name}\n"
         f"💼 <b>Должность:</b> {test_state.position}\n"
         f"🏢 <b>Подразделение:</b> {test_state.department}\n"
@@ -183,8 +215,6 @@ async def finish_test(
         f"💯 <b>Процент:</b> {test_state.percentage:.1f}%\n"
         f"⏱ <b>Время:</b> {test_state.elapsed_time}"
     )
-    
-    chat_id = query.message.chat.chatId
     
     # Редактируем последнее сообщение вопроса результатами (не удаляем)
     if test_state.last_message_id:
