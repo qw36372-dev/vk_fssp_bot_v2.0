@@ -38,7 +38,7 @@ HELP_TEXT = (
     "3️⃣ Выберите уровень сложности\n"
     "4️⃣ Отвечайте на вопросы (1️⃣2️⃣3️⃣...)\n"
     "5️⃣ Нажмите ➡️ Далее\n"
-    "6️⃣ Получите результат и PDF сертификат\n\n"
+    "6️⃣ Получите результат и сертификат\n\n"
     "<b>Уровни сложности:</b>\n"
     "🥉 Резерв: 20 вопросов, 35 мин\n"
     "🥈 Базовый: 30 вопросов, 25 мин\n"
@@ -47,7 +47,7 @@ HELP_TEXT = (
     "Удачи! 🍀"
 )
 
-MAIN_MENU_TEXT = "🧪 <b>ФССП Тест-бот</b>\n\nВыберите специализацию:"
+
 
 
 def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
@@ -341,15 +341,20 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
     # ------------------------------------------------------------------ #
     async def on_help(bot: "VKBot", query: "VKCallbackQuery", user_id: str):
         await bot.answer_callback(query.queryId)
-        try:
-            await bot.edit_text(
-                query.message.chat.chatId, query.message.msgId,
-                HELP_TEXT, get_main_keyboard()
-            )
-        except Exception:
-            await bot.send_text(
-                query.message.chat.chatId, HELP_TEXT, get_main_keyboard()
-            )
+        chat_id = query.message.chat.chatId
+        resp = await bot.send_text(chat_id, HELP_TEXT)
+
+        # Автоскрытие через 60 секунд
+        if resp and resp.get("ok"):
+            msg_id = str(resp.get("msgId", ""))
+            async def hide_help():
+                await asyncio.sleep(settings.answers_show_time)
+                try:
+                    await bot.edit_text(chat_id, msg_id,
+                        "❓ Помощь скрыта. Для повтора нажмите кнопку снова.")
+                except Exception:
+                    pass
+            asyncio.create_task(hide_help())
 
     return {
         # Callback handlers (keyed by callbackData prefix/exact)
