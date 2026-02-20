@@ -149,6 +149,11 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
         await stats_manager.update_user_activity(user_id)
         
         await state_manager.set_state(user_id, TestStates.ANSWERING_QUESTION)
+        
+        # Устанавливаем ID сообщения выбора сложности — первый вопрос отредактирует его
+        # вместо отправки нового сообщения. Так кнопки сложности исчезают без следа.
+        test_state.last_message_id = str(query.message.msgId)
+        
         await state_manager.update_data(user_id, test_state=test_state)
         
         await show_question(bot, chat_id, test_state, question_index=0)
