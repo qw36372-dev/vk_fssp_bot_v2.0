@@ -316,7 +316,20 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
                             f"{r['grade']} — {r['percentage']:.1f}%\n"
                         )
             await bot.answer_callback(query.queryId)
-            await bot.send_text(query.message.chat.chatId, text)
+            chat_id = query.message.chat.chatId
+            resp = await bot.send_text(chat_id, text)
+            
+            # Автоскрытие через 60 секунд — как у правильных ответов
+            if resp and resp.get("ok"):
+                msg_id = str(resp.get("msgId", ""))
+                async def hide_stats():
+                    await asyncio.sleep(settings.answers_show_time)
+                    try:
+                        await bot.edit_text(chat_id, msg_id,
+                            "📋 Статистика скрыта. Для повтора нажмите кнопку снова.")
+                    except Exception:
+                        pass
+                asyncio.create_task(hide_stats())
         except Exception as e:
             logger.error(f"❌ Ошибка статистики: {e}", exc_info=True)
             await bot.answer_callback(query.queryId, "❌ Ошибка загрузки", True)
