@@ -140,14 +140,44 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
         
         async def on_timeout():
             try:
-                # Читаем актуальный test_state из state_manager (он обновлялся по ходу теста)
+                logger.info(f"⏳ Обработка таймаута для {user_id} в чате {chat_id}")
+                
+                # Читаем актуальный test_state из state_manager
                 current_data = await state_manager.get_data(user_id)
                 current_test_state = current_data.get("test_state", test_state)
                 
-                # Сразу блокируем дальнейшие ответы
+                if not current_test_state:
+                    logger.error(f"❌ Таймаут: test_state не найден для {user_id}")
+                    return
+                
+                # Блокируем дальнейшие ответы
                 await state_manager.set_state(user_id, TestStates.SHOWING_RESULTS)
                 
-                await finish_test(bot, query, user_id, current_test_state, timed_out=True)
+                last_msg_id = current_test_state.last_message_id
+                logger.info(f"⏳ Редактируем сообщение {last_msg_id} в чате {chat_id}")
+
+                # 1. Редактируем текущий вопрос — он становится недоступен
+                if last_msg_id:
+                    resp = await bot.edit_text(
+                        chat_id, last_msg_id,
+                        "🔒 <b>Тест недоступен.</b>\nДля повтора нажмите /start"
+                    )
+                    logger.info(f"⏳ edit_text ответ: {resp}")
+
+                # 2. Отправляем новое сообщение — генерирует пуш-уведомление
+                push_resp = await bot.send_text(
+                    chat_id,
+                    "⏳ <b>ВРЕМЯ ВЫШЛО</b> ⌛️\n\n❌ <b>Тест не сдан</b> ❌"
+                )
+                logger.info(f"⏳ send_text (пуш) ответ: {push_resp}")
+
+                # Пауза чтобы пользователь увидел сообщение
+                import asyncio as _aio
+                await _aio.sleep(2)
+
+                # 3. Показываем итоговый экран с результатами и кнопками
+                await finish_test(bot, chat_id, user_id, current_test_state)
+                
             except Exception as e:
                 logger.error(f"❌ Ошибка таймаута: {e}", exc_info=True)
         
@@ -353,7 +383,11 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
     async def on_help(bot: "VKBot", query: "VKCallbackQuery", user_id: str):
         await bot.answer_callback(query.queryId)
         chat_id = query.message.chat.chatId
-        await bot.send_text(chat_id, HELP_TEXT)
+        # Редактируем приветственное сообщение на месте — не добавляем новое
+        try:
+            await bot.edit_text(chat_id, query.message.msgId, HELP_TEXT, get_main_keyboard())
+        except Exception:
+            await bot.send_text(chat_id, HELP_TEXT, get_main_keyboard())
 
     return {
         # Callback handlers (keyed by callbackData prefix/exact)
