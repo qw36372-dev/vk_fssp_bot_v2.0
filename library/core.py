@@ -130,6 +130,15 @@ async def handle_next_question(
         await bot.answer_callback(query.queryId, "❌ Тест не найден")
         return
     
+    # Блокируем переход если не выбран ни один ответ
+    if not test_state.selected_answers:
+        await bot.answer_callback(
+            query.queryId,
+            "⚠️ Выберите вариант ответа перед переходом к следующему вопросу",
+            True
+        )
+        return
+
     test_state.save_answer(test_state.current_index)
     test_state.selected_answers.clear()
     test_state.current_index += 1
