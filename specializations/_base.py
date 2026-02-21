@@ -353,19 +353,7 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
     async def on_help(bot: "VKBot", query: "VKCallbackQuery", user_id: str):
         await bot.answer_callback(query.queryId)
         chat_id = query.message.chat.chatId
-        resp = await bot.send_text(chat_id, HELP_TEXT)
-
-        # Автоскрытие через 60 секунд
-        if resp and resp.get("ok"):
-            msg_id = str(resp.get("msgId", ""))
-            async def hide_help():
-                await asyncio.sleep(settings.answers_show_time)
-                try:
-                    await bot.edit_text(chat_id, msg_id,
-                        "❓ Помощь скрыта. Для повтора нажмите кнопку снова.")
-                except Exception:
-                    pass
-            asyncio.create_task(hide_help())
+        await bot.send_text(chat_id, HELP_TEXT)
 
     return {
         # Callback handlers (keyed by callbackData prefix/exact)
