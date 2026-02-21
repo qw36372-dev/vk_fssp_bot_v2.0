@@ -152,18 +152,25 @@ async def handle_next_question(
 
 async def finish_test(
     bot: "VKBot",
-    query: "VKCallbackQuery",
+    chat_id_or_query,
     user_id: str,
     test_state: CurrentTestState | None = None,
-    timed_out: bool = False
 ):
-    """Завершение теста: подсчёт результатов, сохранение в БД."""
+    """Завершение теста: подсчёт результатов, сохранение в БД.
+    
+    chat_id_or_query: строка chat_id (при таймауте) или VKCallbackQuery (при обычном завершении)
+    """
+    # Получаем chat_id из строки или из query-объекта
+    if isinstance(chat_id_or_query, str):
+        chat_id = chat_id_or_query
+    else:
+        chat_id = chat_id_or_query.message.chat.chatId
+
     if test_state is None:
         data = await state_manager.get_data(user_id)
         test_state = data.get("test_state")
     
     if not test_state:
-        chat_id = query.message.chat.chatId
         await bot.send_text(chat_id, "❌ Ошибка: тест не найден")
         return
     
@@ -176,35 +183,14 @@ async def finish_test(
     # Сохраняем в БД
     await stats_manager.save_result(user_id, test_state)
     
-    chat_id = query.message.chat.chatId
-    
-    if timed_out:
-        # Сначала показываем сообщение о конце времени
-        timeout_text = (
-            "⏳ <b>ВРЕМЯ ВЫШЛО</b> ⌛️\n\n"
-            "❌ <b>Тест не сдан</b> ❌"
-        )
-        if test_state.last_message_id:
-            try:
-                await bot.edit_text(chat_id, test_state.last_message_id, timeout_text)
-            except Exception:
-                await bot.send_text(chat_id, timeout_text)
-        else:
-            await bot.send_text(chat_id, timeout_text)
-        
-        # Небольшая пауза чтобы пользователь увидел сообщение
-        import asyncio as _asyncio
-        await _asyncio.sleep(2)
-    
     grade_emoji = {
         "отлично": "🏆", "хорошо": "👍",
         "удовлетворительно": "👌", "неудовлетворительно": "❌"
     }
     emoji = grade_emoji.get(test_state.grade, "📊")
     
-    header = "⏳ <b>ВРЕМЯ ВЫШЛО</b> ⌛️\n\n" if timed_out else ""
     result_text = (
-        f"{header}{emoji} <b>Тест завершён!</b>\n\n"
+        f"{emoji} <b>Тест завершён!</b>\n\n"
         f"👤 <b>ФИО:</b> {test_state.full_name}\n"
         f"💼 <b>Должность:</b> {test_state.position}\n"
         f"🏢 <b>Подразделение:</b> {test_state.department}\n"
