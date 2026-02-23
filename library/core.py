@@ -20,6 +20,23 @@ logger = logging.getLogger(__name__)
 
 NUMBER_EMOJI = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣", 6: "6️⃣"}
 
+SPEC_LABELS = {
+    "aliment":     "Алименты",
+    "bezopasnost": "Обеспечение собственной безопасности",
+    "doznanie":    "Дознание",
+    "informatika": "Информатизация и информационная безопасность",
+    "ispolniteli": "Исполнительное производство",
+    "kadry":       "Кадровая работа",
+    "oko":         "Организация управления и контроля",
+    "oupds":       "ООУПДС",
+    "prof":        "Организация профессиональной подготовки",
+    "rozyisk":     "Исполнительный розыск и реализация имущества",
+    "upravlenie":  "Управленческая деятельность",
+}
+
+def get_spec_label(spec_name: str) -> str:
+    return SPEC_LABELS.get(spec_name, spec_name)
+
 
 def _build_question_text(test_state: CurrentTestState) -> str:
     """Собирает текст вопроса с вариантами ответов."""
@@ -219,7 +236,7 @@ async def finish_test(
         f"👤 <b>ФИО:</b> {test_state.full_name}\n"
         f"💼 <b>Должность:</b> {test_state.position}\n"
         f"🏢 <b>Подразделение:</b> {test_state.department}\n"
-        f"📚 <b>Специализация:</b> {test_state.specialization}\n"
+        f"📚 <b>Специализация:</b> {get_spec_label(test_state.specialization)}\n"
         f"📊 <b>Уровень:</b> {test_state.difficulty.value.capitalize()}\n\n"
         f"✅ <b>Оценка:</b> {test_state.grade.upper()}\n"
         f"📈 <b>Правильных ответов:</b> {test_state.correct_count} из {test_state.total_questions}\n"
