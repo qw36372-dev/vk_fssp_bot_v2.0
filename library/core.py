@@ -81,6 +81,11 @@ async def handle_answer_toggle(
         await bot.answer_callback(query.queryId, "❌ Ошибка")
         return
     
+    current_state = await state_manager.get_state(user_id)
+    if current_state != TestStates.ANSWERING_QUESTION:
+        await bot.answer_callback(query.queryId, "⏳ Время вышло, тест завершён", True)
+        return
+
     data = await state_manager.get_data(user_id)
     test_state: CurrentTestState | None = data.get("test_state")
     if not test_state:
@@ -114,12 +119,33 @@ async def handle_next_question(
     user_id: str
 ):
     """Кнопка «Далее» — переход к следующему вопросу."""
+    current_state = await state_manager.get_state(user_id)
+    if current_state != TestStates.ANSWERING_QUESTION:
+        await bot.answer_callback(query.queryId, "⏳ Время вышло, тест завершён", True)
+        return
+
     data = await state_manager.get_data(user_id)
     test_state: CurrentTestState | None = data.get("test_state")
     if not test_state:
         await bot.answer_callback(query.queryId, "❌ Тест не найден")
         return
     
+    # Блокируем переход если не выбран ни один ответ
+    if not test_state.selected_answers:
+        await bot.answer_callback(query.queryId)
+        question = test_state.questions[test_state.current_index]
+        warning_prefix = "⚠️ <b>Выберите хотя бы один вариант ответа!</b>\n\n"
+        warning_text = warning_prefix + _build_question_text(test_state)
+        keyboard = get_test_keyboard(len(question.options), test_state.selected_answers)
+        try:
+            await bot.edit_text(
+                query.message.chat.chatId, query.message.msgId,
+                warning_text, keyboard
+            )
+        except Exception:
+            pass
+        return
+
     test_state.save_answer(test_state.current_index)
     test_state.selected_answers.clear()
     test_state.current_index += 1
@@ -142,17 +168,25 @@ async def handle_next_question(
 
 async def finish_test(
     bot: "VKBot",
-    query: "VKCallbackQuery",
+    chat_id_or_query,
     user_id: str,
-    test_state: CurrentTestState | None = None
+    test_state: CurrentTestState | None = None,
 ):
-    """Завершение теста: подсчёт результатов, сохранение в БД."""
+    """Завершение теста: подсчёт результатов, сохранение в БД.
+    
+    chat_id_or_query: строка chat_id (при таймауте) или VKCallbackQuery (при обычном завершении)
+    """
+    # Получаем chat_id из строки или из query-объекта
+    if isinstance(chat_id_or_query, str):
+        chat_id = chat_id_or_query
+    else:
+        chat_id = chat_id_or_query.message.chat.chatId
+
     if test_state is None:
         data = await state_manager.get_data(user_id)
         test_state = data.get("test_state")
     
     if not test_state:
-        chat_id = query.message.chat.chatId
         await bot.send_text(chat_id, "❌ Ошибка: тест не найден")
         return
     
@@ -183,8 +217,6 @@ async def finish_test(
         f"💯 <b>Процент:</b> {test_state.percentage:.1f}%\n"
         f"⏱ <b>Время:</b> {test_state.elapsed_time}"
     )
-    
-    chat_id = query.message.chat.chatId
     
     # Редактируем последнее сообщение вопроса результатами (не удаляем)
     if test_state.last_message_id:
