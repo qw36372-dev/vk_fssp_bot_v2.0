@@ -21,7 +21,7 @@ from library.keyboards import (
 )
 from library.core import (
     show_question, handle_answer_toggle,
-    handle_next_question, finish_test
+    handle_next_question, finish_test, get_spec_label
 )
 from library.timers import create_timer
 from library.stats import stats_manager
@@ -269,7 +269,7 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
             f"👤 <b>ФИО:</b> {test_state.full_name}\n"
             f"💼 <b>Должность:</b> {test_state.position}\n"
             f"🏢 <b>Подразделение:</b> {test_state.department}\n\n"
-            f"📚 <b>Специализация:</b> {test_state.specialization.upper()}\n"
+            f"📚 <b>Специализация:</b> {get_spec_label(test_state.specialization)}\n"
             f"📊 <b>Уровень:</b> {test_state.difficulty.value.capitalize()}\n\n"
             f"{g_emoji} <b>Оценка:</b> {test_state.grade.upper()}\n"
             f"✅ <b>Правильных ответов:</b> {test_state.correct_count} из {test_state.total_questions}\n"
