@@ -119,51 +119,72 @@ async def handle_next_question(
     user_id: str
 ):
     """Кнопка «Далее» — переход к следующему вопросу."""
-    current_state = await state_manager.get_state(user_id)
-    if current_state != TestStates.ANSWERING_QUESTION:
-        await bot.answer_callback(query.queryId, "⏳ Время вышло, тест завершён", True)
-        return
+    try:
+        logger.debug(f"➡️ handle_next_question вызван для {user_id}")
+        
+        current_state = await state_manager.get_state(user_id)
+        if current_state != TestStates.ANSWERING_QUESTION:
+            logger.info(f"⛔ Нажата Далее вне теста, состояние: {current_state}")
+            try:
+                await bot.answer_callback(query.queryId)
+            except Exception:
+                pass
+            return
 
-    data = await state_manager.get_data(user_id)
-    test_state: CurrentTestState | None = data.get("test_state")
-    if not test_state:
-        await bot.answer_callback(query.queryId, "❌ Тест не найден")
-        return
-    
-    # Блокируем переход если не выбран ни один ответ
-    if not test_state.selected_answers:
-        await bot.answer_callback(query.queryId)
-        question = test_state.questions[test_state.current_index]
-        warning_prefix = "⚠️ <b>Выберите хотя бы один вариант ответа!</b>\n\n"
-        warning_text = warning_prefix + _build_question_text(test_state)
-        keyboard = get_test_keyboard(len(question.options), test_state.selected_answers)
-        chat_id = query.message.chat.chatId
-        # Используем last_message_id — актуальный ID текущего вопроса
-        msg_id = test_state.last_message_id or query.message.msgId
+        data = await state_manager.get_data(user_id)
+        test_state: CurrentTestState | None = data.get("test_state")
+        if not test_state:
+            logger.error(f"❌ handle_next_question: test_state не найден для {user_id}")
+            try:
+                await bot.answer_callback(query.queryId)
+            except Exception:
+                pass
+            return
+        
+        # Блокируем переход если не выбран ни один ответ
+        if not test_state.selected_answers:
+            logger.info(f"⚠️ {user_id} нажал Далее без выбора ответа на вопросе {test_state.current_index + 1}")
+            try:
+                await bot.answer_callback(query.queryId)
+            except Exception as e:
+                logger.error(f"❌ answer_callback ошибка: {e}")
+            question = test_state.questions[test_state.current_index]
+            warning_prefix = "⚠️ <b>Выберите хотя бы один вариант ответа!</b>\n\n"
+            warning_text = warning_prefix + _build_question_text(test_state)
+            keyboard = get_test_keyboard(len(question.options), test_state.selected_answers)
+            chat_id = query.message.chat.chatId
+            msg_id = test_state.last_message_id or query.message.msgId
+            logger.info(f"⚠️ Редактируем сообщение {msg_id} с предупреждением")
+            try:
+                resp = await bot.edit_text(chat_id, msg_id, warning_text, keyboard)
+                logger.info(f"⚠️ edit_text (warning) ответ: {resp}")
+            except Exception as e:
+                logger.error(f"❌ edit_text (warning) ошибка: {e}", exc_info=True)
+            return
+
+        test_state.save_answer(test_state.current_index)
+        test_state.selected_answers.clear()
+        test_state.current_index += 1
+        
         try:
-            await bot.edit_text(chat_id, msg_id, warning_text, keyboard)
+            await bot.answer_callback(query.queryId)
         except Exception as e:
-            logger.error(f"❌ edit_text (warning) ошибка: {e}", exc_info=True)
-        return
-
-    test_state.save_answer(test_state.current_index)
-    test_state.selected_answers.clear()
-    test_state.current_index += 1
-    
-    await bot.answer_callback(query.queryId)
-    
-    if test_state.current_index >= len(test_state.questions):
-        await finish_test(bot, query, user_id, test_state)
-        return
-    
-    chat_id = query.message.chat.chatId
-    await show_question(bot, chat_id, test_state)
-    await state_manager.update_data(user_id, test_state=test_state)
-    
-    logger.info(
-        f"➡️ {user_id}: вопрос "
-        f"{test_state.current_index + 1}/{len(test_state.questions)}"
-    )
+            logger.error(f"❌ answer_callback ошибка: {e}")
+        
+        if test_state.current_index >= len(test_state.questions):
+            await finish_test(bot, query, user_id, test_state)
+            return
+        
+        chat_id = query.message.chat.chatId
+        await show_question(bot, chat_id, test_state)
+        await state_manager.update_data(user_id, test_state=test_state)
+        
+        logger.info(
+            f"➡️ {user_id}: вопрос "
+            f"{test_state.current_index + 1}/{len(test_state.questions)}"
+        )
+    except Exception as e:
+        logger.error(f"❌ Критическая ошибка в handle_next_question: {e}", exc_info=True)
 
 
 async def finish_test(
