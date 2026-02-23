@@ -137,13 +137,13 @@ async def handle_next_question(
         warning_prefix = "⚠️ <b>Выберите хотя бы один вариант ответа!</b>\n\n"
         warning_text = warning_prefix + _build_question_text(test_state)
         keyboard = get_test_keyboard(len(question.options), test_state.selected_answers)
+        chat_id = query.message.chat.chatId
+        # Используем last_message_id — актуальный ID текущего вопроса
+        msg_id = test_state.last_message_id or query.message.msgId
         try:
-            await bot.edit_text(
-                query.message.chat.chatId, query.message.msgId,
-                warning_text, keyboard
-            )
-        except Exception:
-            pass
+            await bot.edit_text(chat_id, msg_id, warning_text, keyboard)
+        except Exception as e:
+            logger.error(f"❌ edit_text (warning) ошибка: {e}", exc_info=True)
         return
 
     test_state.save_answer(test_state.current_index)
@@ -222,7 +222,8 @@ async def finish_test(
     if test_state.last_message_id:
         try:
             await bot.edit_text(chat_id, test_state.last_message_id, result_text, get_finish_keyboard())
-        except Exception:
+        except Exception as e:
+            logger.error(f"❌ edit_text (finish) ошибка: {e}", exc_info=True)
             await bot.send_text(chat_id, result_text, get_finish_keyboard())
     else:
         await bot.send_text(chat_id, result_text, get_finish_keyboard())
