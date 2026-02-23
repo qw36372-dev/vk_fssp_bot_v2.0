@@ -141,25 +141,13 @@ async def handle_next_question(
                 pass
             return
         
-        # Блокируем переход если не выбран ни один ответ
+        # Блокируем переход если не выбран ни один ответ — просто игнорируем нажатие
         if not test_state.selected_answers:
-            logger.info(f"⚠️ {user_id} нажал Далее без выбора ответа на вопросе {test_state.current_index + 1}")
+            logger.info(f"⚠️ {user_id} нажал Далее без выбора ответа (вопрос {test_state.current_index + 1})")
             try:
                 await bot.answer_callback(query.queryId)
             except Exception as e:
                 logger.error(f"❌ answer_callback ошибка: {e}")
-            question = test_state.questions[test_state.current_index]
-            warning_prefix = "⚠️ <b>Выберите хотя бы один вариант ответа!</b>\n\n"
-            warning_text = warning_prefix + _build_question_text(test_state)
-            keyboard = get_test_keyboard(len(question.options), test_state.selected_answers)
-            chat_id = query.message.chat.chatId
-            msg_id = test_state.last_message_id or query.message.msgId
-            logger.info(f"⚠️ Редактируем сообщение {msg_id} с предупреждением")
-            try:
-                resp = await bot.edit_text(chat_id, msg_id, warning_text, keyboard)
-                logger.info(f"⚠️ edit_text (warning) ответ: {resp}")
-            except Exception as e:
-                logger.error(f"❌ edit_text (warning) ошибка: {e}", exc_info=True)
             return
 
         test_state.save_answer(test_state.current_index)
