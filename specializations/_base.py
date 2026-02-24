@@ -339,7 +339,7 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
                     text += "\n\n<b>Последние тесты:</b>\n"
                     for r in stats["recent_tests"]:
                         text += (
-                            f"• {r['specialization']} ({r['difficulty']}): "
+                            f"• {get_spec_label(r['specialization'])} ({r['difficulty']}): "
                             f"{r['grade']} — {r['percentage']:.1f}%\n"
                         )
             await bot.answer_callback(query.queryId)
