@@ -272,7 +272,7 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
             f"📚 <b>Специализация:</b> {get_spec_label(test_state.specialization)}\n"
             f"📊 <b>Уровень:</b> {test_state.difficulty.value.capitalize()}\n\n"
             f"{g_emoji} <b>Оценка:</b> {test_state.grade.upper()}\n"
-            f"✅ <b>Правильных ответов:</b> {test_state.correct_count} из {test_state.total_questions}\n"
+            f"📈 <b>Правильных ответов:</b> {test_state.correct_count} из {test_state.total_questions}\n"
             f"💯 <b>Результат:</b> {test_state.percentage:.1f}%\n"
             f"⏱ <b>Время:</b> {test_state.elapsed_time}\n\n"
             f"📅 <b>Дата:</b> {datetime.now().strftime('%d.%m.%Y')}\n"
