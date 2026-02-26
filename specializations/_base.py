@@ -299,10 +299,17 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
     # Повторить тест
     # ------------------------------------------------------------------ #
     async def on_repeat(bot: "VKBot", query: "VKCallbackQuery", user_id: str):
+        # Читаем специализацию из state_manager — реальный выбор пользователя
+        data = await state_manager.get_data(user_id)
+        test_state = data.get("test_state")
+        actual_spec = test_state.specialization if test_state else spec_name
+        actual_label = get_spec_label(actual_spec)
+        actual_emoji = SPEC_EMOJIS.get(actual_spec, "📚")
+
         await state_manager.clear(user_id)
         chat_id = query.message.chat.chatId
         await bot.answer_callback(query.queryId)
-        # Заменяем результаты теста заглушкой — не трогаем историю сообщений
+        # Заменяем результаты теста заглушкой
         try:
             await bot.edit_text(
                 chat_id, query.message.msgId,
@@ -310,13 +317,13 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
             )
         except Exception:
             pass
-        # Отправляем запрос ФИО новым сообщением — ниже всей истории
+        # Отправляем запрос ФИО новым сообщением
         await bot.send_text(
             chat_id,
-            f"{spec_emoji} <b>{spec_label}</b>\n\nВведите ваше ФИО:"
+            f"{actual_emoji} <b>{actual_label}</b>\n\nВведите ваше ФИО:"
         )
         await state_manager.set_state(user_id, TestStates.WAITING_FULL_NAME)
-        await state_manager.update_data(user_id, specialization=spec_name)
+        await state_manager.update_data(user_id, specialization=actual_spec)
 
     # ------------------------------------------------------------------ #
     # Статистика
