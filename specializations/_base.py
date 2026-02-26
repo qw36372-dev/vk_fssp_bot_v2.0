@@ -302,16 +302,19 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
         await state_manager.clear(user_id)
         chat_id = query.message.chat.chatId
         await bot.answer_callback(query.queryId)
+        # Заменяем результаты теста заглушкой — не трогаем историю сообщений
         try:
             await bot.edit_text(
                 chat_id, query.message.msgId,
-                f"{spec_emoji} <b>{spec_label}</b>\n\nВведите ваше ФИО:"
+                "🔄 Повторное прохождение теста начато."
             )
         except Exception:
-            await bot.send_text(
-                chat_id,
-                f"{spec_emoji} <b>{spec_label}</b>\n\nВведите ваше ФИО:"
-            )
+            pass
+        # Отправляем запрос ФИО новым сообщением — ниже всей истории
+        await bot.send_text(
+            chat_id,
+            f"{spec_emoji} <b>{spec_label}</b>\n\nВведите ваше ФИО:"
+        )
         await state_manager.set_state(user_id, TestStates.WAITING_FULL_NAME)
         await state_manager.update_data(user_id, specialization=spec_name)
 
@@ -369,13 +372,16 @@ def make_handlers(spec_name: str, spec_label: str, spec_emoji: str):
         await state_manager.clear(user_id)
         chat_id = query.message.chat.chatId
         await bot.answer_callback(query.queryId)
+        # Заменяем результаты теста заглушкой — не трогаем историю сообщений
         try:
             await bot.edit_text(
                 chat_id, query.message.msgId,
-                _MENU_TEXT, get_main_keyboard()
+                "🏠 Пользователь перешёл в главное меню."
             )
         except Exception:
-            await bot.send_text(chat_id, _MENU_TEXT, get_main_keyboard())
+            pass
+        # Отправляем главное меню новым сообщением — ниже всей истории
+        await bot.send_text(chat_id, _MENU_TEXT, get_main_keyboard())
 
     # ------------------------------------------------------------------ #
     # Помощь
