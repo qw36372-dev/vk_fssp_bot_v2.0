@@ -74,7 +74,7 @@ def get_finish_keyboard() -> List[List[Dict]]:
     """Клавиатура после завершения теста."""
     return [
         [_btn("📋 Показать правильные ответы", "show_answers",  STYLE_BASE)],
-        [_btn("🏆 Сертификат",                  "generate_cert", STYLE_PRIMARY)],
+        [_btn("🏆 Сертификат PDF",              "generate_cert", STYLE_PRIMARY)],
         [_btn("🔄 Повторить тест",               "repeat_test",   STYLE_BASE)],
         [_btn("📊 Моя статистика",               "my_stats",      STYLE_BASE)],
         [_btn("🏠 Главное меню",                 "main_menu",     STYLE_BASE)],
