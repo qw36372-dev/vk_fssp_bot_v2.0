@@ -43,14 +43,8 @@ def _build_question_text(test_state: CurrentTestState) -> str:
     question = test_state.questions[test_state.current_index]
     timer_text = test_state.timer_task.remaining_time() if test_state.timer_task else "∞"
     
-    # ⚠️ предупреждение если осталось меньше 5 минут
-    if test_state.timer_task:
-        remaining_secs = max(0, test_state.timer_task.duration_seconds - (__import__("time").time() - test_state.timer_task.start_time))
-        timer_warn = "⚠️ " if remaining_secs < 300 else ""
-    else:
-        timer_warn = ""
     header = (
-        f"{timer_warn}⏰ Осталось: <b>{timer_text}</b>\n\n"
+        f"⏰ Осталось: <b>{timer_text}</b>\n\n"
         f"📝 <b>Вопрос {test_state.current_index + 1}/{len(test_state.questions)}</b>"
     )
     
