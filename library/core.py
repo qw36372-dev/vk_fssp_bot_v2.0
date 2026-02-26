@@ -43,8 +43,14 @@ def _build_question_text(test_state: CurrentTestState) -> str:
     question = test_state.questions[test_state.current_index]
     timer_text = test_state.timer_task.remaining_time() if test_state.timer_task else "∞"
     
+    # ⚠️ предупреждение если осталось меньше 5 минут
+    if test_state.timer_task:
+        remaining_secs = max(0, test_state.timer_task.duration_seconds - (__import__("time").time() - test_state.timer_task.start_time))
+        timer_warn = "⚠️ " if remaining_secs < 300 else ""
+    else:
+        timer_warn = ""
     header = (
-        f"⏰ Осталось: <b>{timer_text}</b>\n\n"
+        f"{timer_warn}⏰ Осталось: <b>{timer_text}</b>\n\n"
         f"📝 <b>Вопрос {test_state.current_index + 1}/{len(test_state.questions)}</b>"
     )
     
@@ -100,13 +106,18 @@ async def handle_answer_toggle(
     
     current_state = await state_manager.get_state(user_id)
     if current_state != TestStates.ANSWERING_QUESTION:
-        await bot.answer_callback(query.queryId, "⏳ Время вышло, тест завершён", True)
+        await bot.answer_callback(query.queryId)
         return
 
     data = await state_manager.get_data(user_id)
     test_state: CurrentTestState | None = data.get("test_state")
     if not test_state:
-        await bot.answer_callback(query.queryId, "❌ Тест не найден")
+        await bot.answer_callback(query.queryId)
+        return
+
+    # Защита от нажатия кнопок старых вопросов (при прокрутке чата вверх)
+    if test_state.last_message_id and str(query.message.msgId) != test_state.last_message_id:
+        await bot.answer_callback(query.queryId)
         return
     
     if answer_num in test_state.selected_answers:
@@ -231,16 +242,19 @@ async def finish_test(
     }
     emoji = grade_emoji.get(test_state.grade, "📊")
     
+    # Уровень с заглавной буквы
+    level_cap = test_state.difficulty.value.capitalize()
+    
     result_text = (
         f"{emoji} <b>Тест завершён!</b>\n\n"
         f"👤 <b>ФИО:</b> {test_state.full_name}\n"
         f"💼 <b>Должность:</b> {test_state.position}\n"
         f"🏢 <b>Подразделение:</b> {test_state.department}\n"
         f"📚 <b>Специализация:</b> {get_spec_label(test_state.specialization)}\n"
-        f"📊 <b>Уровень:</b> {test_state.difficulty.value.capitalize()}\n\n"
-        f"✅ <b>Оценка:</b> {test_state.grade.upper()}\n"
+        f"📊 <b>Уровень:</b> {level_cap}\n\n"
+        f"{emoji} <b>Оценка:</b> {test_state.grade.upper()}\n"
         f"📈 <b>Правильных ответов:</b> {test_state.correct_count} из {test_state.total_questions}\n"
-        f"💯 <b>Процент:</b> {test_state.percentage:.1f}%\n"
+        f"💯 <b>Результат:</b> {test_state.percentage:.1f}%\n"
         f"⏱ <b>Время:</b> {test_state.elapsed_time}"
     )
     

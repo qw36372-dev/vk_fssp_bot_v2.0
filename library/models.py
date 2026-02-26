@@ -94,4 +94,9 @@ class CurrentTestState(BaseModel):
         else:
             self.grade = "неудовлетворительно"
         elapsed = time.time() - self.start_time
-        self.elapsed_time = f"{int(elapsed // 60):02d}:{int(elapsed % 60):02d}"
+        mins = int(elapsed // 60)
+        secs = int(elapsed % 60)
+        if mins > 0:
+            self.elapsed_time = f"{mins} мин {secs} сек"
+        else:
+            self.elapsed_time = f"{secs} сек"
